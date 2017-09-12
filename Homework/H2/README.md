@@ -18,7 +18,8 @@
 
 ​    根据QQ公告修改：
 
-- 程序原则上仅匹配一个正则表达式(即给定的aa*bb*)，且从开头匹配，在遇到非法字符后会报错，而不是跳过、重新开始匹配。
+- 会尽量匹配最长的正规式。
+- 程序匹配某个正规式后，会再该式之后继续查找，而不是在下一字符查找。
 - 程序会parse出所有的词法单元(即被匹配的字符串中，对应的aa\*和bb\*两部分)。
 - **程序具有一定的容错能力**：在aa\*前、aa\*与bb\*之间、bb\*出现的非法字符会被忽略。
 
@@ -42,9 +43,9 @@ gcc main.c
 
 ```powershell
 Input a string:
-aaab
-find lexical unit: aaa
-find lexical unit: b
+abbb
+Find matching lexical unit: a
+Find matching lexical unit: bbb
 请按任意键继续. . .
 ```
 
@@ -52,12 +53,14 @@ find lexical unit: b
 
 ```powershell
 Input a string:
-aaadddbbb
-find lexical unit: aaa
-Encounter a invalid character, skip...
-Encounter a invalid character, skip...
-Encounter a invalid character, skip...
-find lexical unit: bbb
+abbbxxaaaibb
+Find matching lexical unit: a
+Find matching lexical unit: bbb
+Omitting an invalid character...
+Omitting an invalid character...
+Find matching lexical unit: aaa
+Omitting an invalid character...
+Find matching lexical unit: bb
 请按任意键继续. . .
 ```
 

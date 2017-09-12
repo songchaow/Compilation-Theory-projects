@@ -13,8 +13,33 @@
 int match(char* a)
 // return the length that matched
 {
-    char* p = a;
-    //deal with inrelevant letters
+    char* begin = a; //beginning of the possible match
+    char* curr = a; //current
+    char* it;
+    while(*begin)
+    {
+        curr = begin;
+        if((*curr !='a')&&(*curr != 'b')) 
+        {
+            printf("Omitting an invalid character...\n");
+            begin++;
+            continue;
+        }
+        // test according to variable begin
+        if(*curr =='a')
+            while(*++curr=='a');
+        else
+            while(*++curr=='b');
+        // output when encounter other characters
+        printf("Find matching lexical unit: ");
+        for(it=begin;it<curr;it++)
+            putchar(*it);
+        putchar('\n');
+        begin = curr;
+    }
+    return 0;
+}
+    /* //deal with inrelevant letters
     while((*a!='a') && (*a!='b') ) {printf("Encounter a invalid character, skip...\n");a++;p++;}
     if(*a=='a')
     {
@@ -39,8 +64,7 @@ int match(char* a)
     }
     else
         printf("Error parsing the string.\n");
-    return 0;
-}
+    return 0; */
 
 int main()
 {
