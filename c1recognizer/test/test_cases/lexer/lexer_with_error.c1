@@ -1,0 +1,15 @@
+// This is a single-line comment
+// This file has 'CRLF' newline sequences
+int main()
+{
+    /* This is a
+       multi-line comment
+    */int j = 2;//int comment = haha;
+    int i = 1;
+    // an error about naming of variables:
+    int 32xdada = 25;
+    // '32xdada' will be interpreted as Number 32 and variable 'xdada'
+    // an error of illegal characters:
+    int dada& = 24;
+    int haha = 0x25+27;
+}

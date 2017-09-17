@@ -1,0 +1,9 @@
+// This is a single-line comment
+// This file has 'LF' newline sequences
+int main()
+{
+    /* This is a
+       multi-line comment
+    */int j = 2;//int comment = haha;
+    int i = 1;
+}
