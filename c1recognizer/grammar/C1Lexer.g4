@@ -34,7 +34,7 @@ tokens {
 }
 
 Comma: ',';
-Semicolon: ';';
+SemiColon: ';';
 Assign: '=';
 LeftBracket: '[';
 RightBracket: ']';
