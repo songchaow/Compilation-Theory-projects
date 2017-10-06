@@ -1,3 +1,4 @@
+const int  j = 5;
 int i = 0;
 void main()
 {

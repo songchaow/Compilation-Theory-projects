@@ -26,12 +26,11 @@ Int=25
 Void=26
 Identifier=27
 Number=28
-Semicolon=29
-WhiteSpace=30
-LineComment=31
-BlockComment=32
+WhiteSpace=29
+LineComment=30
+BlockComment=31
 ','=1
-';'=29
+';'=2
 '='=3
 '['=4
 ']'=5

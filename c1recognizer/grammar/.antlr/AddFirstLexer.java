@@ -1,4 +1,4 @@
-// Generated from /media/songchaow/Windows/Users/Lenovo/OneDrive/大三上/Compilation Theory/PB15000102/c1recognizer/grammar/C1Lexer.g4 by ANTLR 4.7
+// Generated from /media/songchaow/Windows/Users/Lenovo/OneDrive/大三上/Compilation Theory/PB15000102/c1recognizer/grammar/AddFirst.g4 by ANTLR 4.7
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.Token;
@@ -9,7 +9,7 @@ import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
-public class C1Lexer extends Lexer {
+public class AddFirstLexer extends Lexer {
 	static { RuntimeMetaData.checkVersion("4.7", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
@@ -83,13 +83,13 @@ public class C1Lexer extends Lexer {
 	}
 
 
-	public C1Lexer(CharStream input) {
+	public AddFirstLexer(CharStream input) {
 		super(input);
 		_interp = new LexerATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 
 	@Override
-	public String getGrammarFileName() { return "C1Lexer.g4"; }
+	public String getGrammarFileName() { return "AddFirst.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }

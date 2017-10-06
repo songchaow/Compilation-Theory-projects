@@ -1,0 +1,9 @@
+const int  j = 5;
+int i = 0;
+void main()
+{
+    i = 1;
+    i shit = 3; //illegal syntax;
+    i[-] = 4; //illegal syntax;
+    i = 10;
+}
