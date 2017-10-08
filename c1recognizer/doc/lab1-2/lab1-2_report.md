@@ -11,7 +11,7 @@
 **注意**:
 
 - 请在`src/lab1_2/`目录下运行脚本。
-- 请确认java和antlr环境变量已经设置好。
+- 请确认java和antlr相关环境变量已经设置好。
 
 ##分析和设计
 
@@ -55,7 +55,7 @@ Root cause是在编写parser的描述文件时，把部分`SemiColon`写成了`S
 
 ```
 declarations.c1
-expr.c1 #虽然名字为expr 但内容还是compilationUnit(至少是多个stmt)
+expr.c1 #虽然名字为expr 但其内容还是compilationUnit(至少是多个stmt)
 lexical_tokens.c1
 simple.c1
 ```
@@ -64,7 +64,9 @@ simple.c1
 
 ![parse_error](parse_error.png)
 
-## 重点和难点 回答
+## 重点和难点 回答(现已迁移至`lab-1-2-answer`文件夹)
+
+以下测试使用了`grun`工具，更新后的回答位于`lab-1-2-answer` 。
 
 ### `ANTLR`支持的左递归类型
 
