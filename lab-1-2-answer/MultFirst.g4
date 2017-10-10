@@ -39,6 +39,7 @@ WhiteSpace: [ \t\r\n]+ -> skip;
 LineComment: '//'  ~[\r\n]* '\r'? '\n' -> skip ;
 BlockComment: '/*' .*? '*/' -> skip;
 
-e: e '*' e
-    | e '+' e
-    | Number;
+e: e '*' e # Mult
+    | e '+' e # Plus
+    | Number # Number
+    ;

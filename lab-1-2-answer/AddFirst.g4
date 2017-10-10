@@ -40,6 +40,6 @@ LineComment: '//'  ~[\r\n]* '\r'? '\n' -> skip ;
 BlockComment: '/*' .*? '*/' -> skip;
 
 e: e Plus e # Plus
-    | e Multiply e # Multiply
+    | e Multiply e # Mult
     | Number # Number
     ;
