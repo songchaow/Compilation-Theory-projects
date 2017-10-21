@@ -18,17 +18,21 @@ antlrcpp::Any syntax_tree_builder::visitCompilationUnit(C1Parser::CompilationUni
     {
         if(antlrcpp::is<C1Parser::FuncdefContext*>(item))
         // there is only one functin's definition
-            global_defs.push_back(visit(item).as<global_def_syntax*>());
-        else if(antlrcpp::is<C1Parser::DeclContext>)
+        {
+            ptr<global_def_syntax> p;
+            p.reset(visit(item).as<global_def_syntax*>());
+            global_defs.push_back(p);
+        }
+        else if(antlrcpp::is<C1Parser::DeclContext*>(item))
         // it will return a vector containing several var_def_syntaxes
         // we add them to global_defs
         {
             auto var_defs = visit(item).as<ptr_list<global_def_syntax>>();
-            for(auto &var_def : vardefs)
+            for(auto &var_def : var_defs)
                 global_defs.push_back(var_def);
         }
     }
-    return static_cast<ptr_list<global_def_syntax>> global_defs;
+    return static_cast<ptr_list<global_def_syntax>> (global_defs);
 }
 
 antlrcpp::Any syntax_tree_builder::visitDecl(C1Parser::DeclContext *ctx)
@@ -36,22 +40,19 @@ antlrcpp::Any syntax_tree_builder::visitDecl(C1Parser::DeclContext *ctx)
     // it can be constdecl or vardecl, but both share the same syntax structure
     // returns a vector
     
-    if(ctx.constdecl())
-        return static_cast<ptr_list<global_def_syntax>> visit(ctx.constdecl()[0]).as<ptr_list<global_def_syntax>>();
-    else if(ctx.vardecl())
-        return static_cast<ptr_list<global_def_syntax>> visit(ctx.vardecl()[0]).as<ptr_list<global_def_syntax>>();
+    if(ctx->constdecl())
+        return static_cast<ptr_list<global_def_syntax>> (visit(ctx->constdecl()).as<ptr_list<global_def_syntax>>());
+    else if(ctx->vardecl())
+        return static_cast<ptr_list<global_def_syntax>> (visit(ctx->vardecl()).as<ptr_list<global_def_syntax>>());
 }
 
 antlrcpp::Any syntax_tree_builder::visitConstdecl(C1Parser::ConstdeclContext *ctx)
 {
     // one decl may contain multiple defs
 
-    decl->line = ctx->getStart()->getLine();
-    decl->pos = ctx->getStart()->getCharPositionInLine();
-
     ptr_list<var_def_stmt_syntax> var_defs;
-    auto defs = ctx.constdecl()[0].constdef();
-    for(auto def : defs)
+    auto defs = ctx->constdef();
+    for(auto &def : defs)
     {
         ptr<var_def_stmt_syntax> smart_p;
         smart_p.reset(visit(def).as<var_def_stmt_syntax*>()); // call visitConstdef
@@ -63,38 +64,44 @@ antlrcpp::Any syntax_tree_builder::visitConstdecl(C1Parser::ConstdeclContext *ct
 antlrcpp::Any syntax_tree_builder::visitConstdef(C1Parser::ConstdefContext *ctx)
 {
     auto result = new var_def_stmt_syntax;
-    auto children = ctx.children;
+    auto children = ctx->children;
     result->is_constant = true;
-    result->name = def.Identifier().getText();
+    result->name = ctx->Identifier()->getText();
     // seems the same with def.Identifier().getSymbol().getText()
-    if(def.LeftBracket() && def.RightBracket())
+    if(ctx->LeftBracket() && ctx->RightBracket())
     // it's an array
     {
-        auto begin = children.begin();
-        while(begin!=children.end())
+        auto it = children.begin();
+        while(it!=children.end())
         {
-            if(*begin->getSymbol().getType()==C1Parser::LeftBracket)
-                break;//we've locate the LeftBracket
-            begin++;
+            if(antlrcpp::is<antlr4::tree::TerminalNode *>(*it))
+            {
+                antlr4::tree::TerminalNode *tnode = dynamic_cast<antlr4::tree::TerminalNode *>(*it);
+                if(tnode->getSymbol()->getType()==C1Parser::LeftBracket)
+                    break;//we've locate the LeftBracket
+            }
+            it++;
         }
-        if(antlrcpp::is<C1Parser::ExpContext>(*(++begin)))
-            result->array_length = visit(begin).as<expr_syntax*>();
+        if(antlrcpp::is<C1Parser::ExpContext*>(*(++it)))
+            result->array_length.reset( visit(*it).as<expr_syntax*>());
         else
         {
             // deduce the length from number of `exp`
-            auto exps = def.exp();
+            auto exps = ctx->exp();
             literal_syntax* num = new literal_syntax;
             num->number = exps.size(); 
-            result->array_length = num;
+            result->array_length.reset( num );
         }
     }
     else
         result->array_length = nullptr;
-    return static_cast<var_def_stmt_syntax*> result;
+    return static_cast<var_def_stmt_syntax*> (result);
 }
 
 antlrcpp::Any syntax_tree_builder::visitVardecl(C1Parser::VardeclContext *ctx)
 {
+    // one decl may contain multiple defs
+
 }
 
 antlrcpp::Any syntax_tree_builder::visitVardef(C1Parser::VardefContext *ctx)
