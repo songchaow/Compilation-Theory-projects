@@ -19,8 +19,8 @@ antlrcpp::Any syntax_tree_builder::visitCompilationUnit(C1Parser::CompilationUni
         if(antlrcpp::is<C1Parser::FuncdefContext*>(item))
         // there is only one functin's definition
         {
-            ptr<global_def_syntax> p;
-            p.reset(visit(item).as<global_def_syntax*>());
+            ptr<func_def_syntax> p;
+            p.reset(visit(item).as<func_def_syntax*>());
             global_defs.push_back(p);
         }
         else if(antlrcpp::is<C1Parser::DeclContext*>(item))
@@ -43,7 +43,7 @@ antlrcpp::Any syntax_tree_builder::visitDecl(C1Parser::DeclContext *ctx)
     if(ctx->constdecl())
         return static_cast<ptr_list<global_def_syntax>> (visit(ctx->constdecl()).as<ptr_list<global_def_syntax>>());
     else if(ctx->vardecl())
-        return static_cast<ptr_list<global_def_syntax>> (visit(ctx->vardecl()).as<ptr_list<global_def_syntax>>());
+        return static_cast<ptr_list<var_def_stmt_syntax>> (visit(ctx->vardecl()).as<ptr_list<var_def_stmt_syntax>>());
 }
 
 antlrcpp::Any syntax_tree_builder::visitConstdecl(C1Parser::ConstdeclContext *ctx)
@@ -63,15 +63,22 @@ antlrcpp::Any syntax_tree_builder::visitConstdecl(C1Parser::ConstdeclContext *ct
 
 antlrcpp::Any syntax_tree_builder::visitConstdef(C1Parser::ConstdefContext *ctx)
 {
+    // there is always an initializer in constdef
     auto result = new var_def_stmt_syntax;
     auto children = ctx->children;
+    auto exps = ctx->exp();
+    auto first_exp_it = exps.begin();
+    
     result->is_constant = true;
     result->name = ctx->Identifier()->getText();
+    result->line = ctx->getStart()->getLine();
+    result->pos = ctx->getStart()->getCharPositionInLine();
     // seems the same with def.Identifier().getSymbol().getText()
     if(ctx->LeftBracket() && ctx->RightBracket())
     // it's an array
     {
         auto it = children.begin();
+        // determines if there is an `exp` immediately after `LeftBracket`
         while(it!=children.end())
         {
             if(antlrcpp::is<antlr4::tree::TerminalNode *>(*it))
@@ -83,49 +90,234 @@ antlrcpp::Any syntax_tree_builder::visitConstdef(C1Parser::ConstdefContext *ctx)
             it++;
         }
         if(antlrcpp::is<C1Parser::ExpContext*>(*(++it)))
+        {
             result->array_length.reset( visit(*it).as<expr_syntax*>());
+            first_exp_it++; //skip the first exp, since it's the length
+        }
         else
         {
             // deduce the length from number of `exp`
-            auto exps = ctx->exp();
             literal_syntax* num = new literal_syntax;
             num->number = exps.size(); 
             result->array_length.reset( num );
         }
+        
     }
     else
+    // it's a variable
         result->array_length = nullptr;
+    for(;first_exp_it<exps.end();first_exp_it++)
+    {
+        ptr<expr_syntax> initializer;
+        initializer.reset(visit(*first_exp_it).as<expr_syntax*>());
+        result->initializers.push_back(initializer);
+    }
     return static_cast<var_def_stmt_syntax*> (result);
 }
 
 antlrcpp::Any syntax_tree_builder::visitVardecl(C1Parser::VardeclContext *ctx)
 {
     // one decl may contain multiple defs
+    ptr_list<var_def_stmt_syntax> var_defs;
+    auto defs = ctx->vardef();
+    for(auto &def : defs)
+    {
+        ptr<var_def_stmt_syntax> smart_p;
+        smart_p.reset(visit(def).as<var_def_stmt_syntax*>());
+        var_defs.push_back(smart_p);
+    }
+    return var_defs;
 
 }
 
 antlrcpp::Any syntax_tree_builder::visitVardef(C1Parser::VardefContext *ctx)
 {
+    auto result = new var_def_stmt_syntax;
+    auto children = ctx->children;
+    auto exps = ctx->exp();
+    auto first_exp_it = exps.begin();
+    result->is_constant = false;
+    result->name = ctx->Identifier()->getText();
+    result->line = ctx->getStart()->getLine();
+    result->pos = ctx->getStart()->getCharPositionInLine();
+    // different to constdef, there can be no `assign`
+    if(ctx->Assign())
+    {
+        if(ctx->LeftBracket() && ctx->RightBracket())
+        {
+            // the same case with constdef
+            auto it = children.begin();
+            // determines if there is an `exp` immediately after `LeftBracket`
+            while(it!=children.end())
+            {
+                if(antlrcpp::is<antlr4::tree::TerminalNode *>(*it))
+                {
+                    antlr4::tree::TerminalNode *tnode = dynamic_cast<antlr4::tree::TerminalNode *>(*it);
+                    if(tnode->getSymbol()->getType()==C1Parser::LeftBracket)
+                        break;//we've locate the LeftBracket
+                }
+                it++;
+            }
+            if(antlrcpp::is<C1Parser::ExpContext*>(*(++it)))
+            {
+                result->array_length.reset( visit(*it).as<expr_syntax*>());
+                first_exp_it++; //skip the first exp, since it's the length
+            }
+            else
+            {
+                // deduce the length from number of `exp`
+                literal_syntax* num = new literal_syntax;
+                num->number = exps.size(); 
+                result->array_length.reset( num );
+            }
+        }
+        else
+            result->array_length = nullptr;
+        // fill exps into initializeirs
+        for(;first_exp_it<exps.end();first_exp_it++)
+        {
+            ptr<expr_syntax> initializer;
+            initializer.reset(visit(*first_exp_it).as<expr_syntax*>());
+            result->initializers.push_back(initializer);
+        }
+    }
+    else
+        if(ctx->exp().size()>=1) // it must be the array length
+            result->array_length.reset(visit(ctx->exp()[0]).as<expr_syntax*>());
+        else
+            result->array_length = nullptr;
+
+    return result;
 }
 
 antlrcpp::Any syntax_tree_builder::visitFuncdef(C1Parser::FuncdefContext *ctx)
 {
+    auto result = new func_def_syntax;
+    
+    result->line = ctx->getStart()->getLine();
+    result->pos = ctx->getStart()->getCharPositionInLine();
+    result->name = ctx->Identifier()->getText();
+    result->body.reset(visit(ctx->block()).as<block_syntax*>()); //
+    return result;
 }
 
 antlrcpp::Any syntax_tree_builder::visitBlock(C1Parser::BlockContext *ctx)
 {
+    auto block = new block_syntax;
+    block->line = ctx->getStart()->getLine();
+    block->pos = ctx->getStart()->getCharPositionInLine();
+    auto items = ctx->blockitem();
+    for(auto &item : items)
+    {
+        // first, judge whether the item is a stmt or a decl.
+        if(item->decl())
+        // one decl may produce several stmts(defs)
+        {
+            
+            auto stmts = visit(item->decl()).as<ptr_list<var_def_stmt_syntax>>();
+            for(auto &stmt : stmts)
+                block->body.push_back(stmt);
+        }
+        else if(item->stmt())
+        // only one stmt
+        {
+            ptr<stmt_syntax> p_item;
+            p_item.reset(visit(item->stmt()).as<stmt_syntax*>());
+            // the unoverrided function visitBlockitem will call visitDecl and visitStmt
+            block->body.push_back(p_item);
+        }
+    }
+    return block;
 }
 
 antlrcpp::Any syntax_tree_builder::visitStmt(C1Parser::StmtContext *ctx)
 {
+    // 6 alternatives
+    if(ctx->lval()) // 1st
+    {
+        auto stmt = new assign_stmt_syntax;
+        stmt->line = ctx->getStart()->getLine();
+        stmt->pos = ctx->getStart()->getCharPositionInLine();
+        stmt->target.reset(visit(ctx->lval()).as<lval_syntax*>());
+        stmt->value.reset(visit(ctx->exp()).as<expr_syntax*>());
+        return stmt;
+    }
+    if(ctx->Identifier()) //2nd
+    {
+        auto stmt = new func_call_stmt_syntax;
+        stmt->line = ctx->getStart()->getLine();
+        stmt->pos = ctx->getStart()->getCharPositionInLine();
+        stmt->name = ctx->Identifier()->getText();
+        return stmt;
+    }
+    if(ctx->block()) //3rd
+        return visit(ctx->block()).as<block_syntax*>();
+    if(ctx->If()) //4th
+    {
+        auto stmt = new if_stmt_syntax;
+        stmt->line = ctx->getStart()->getLine();
+        stmt->pos = ctx->getStart()->getCharPositionInLine();
+        stmt->pred.reset(visit(ctx->cond()).as<cond_syntax*>());
+        stmt->then_body.reset(visit(ctx->stmt(0)).as<stmt_syntax*>());
+        if(ctx->Else())
+            stmt->else_body.reset(visit(ctx->stmt(1)).as<stmt_syntax*>());
+        else stmt->else_body = nullptr;
+        return stmt;
+    }
+    if(ctx->While()) //5th
+    {
+        auto stmt = new while_stmt_syntax;
+        stmt->line = ctx->getStart()->getLine();
+        stmt->pos = ctx->getStart()->getCharPositionInLine();
+        stmt->pred.reset(visit(ctx->cond()).as<cond_syntax*>());
+        stmt->body.reset(visit(ctx->stmt(0)).as<stmt_syntax*>());
+        return stmt;
+    }
+    if(antlrcpp::is<antlr4::tree::TerminalNode *>(ctx->children[0])) // 6th
+    {
+        antlr4::tree::TerminalNode *tnode = dynamic_cast<antlr4::tree::TerminalNode *>(ctx->children[0]);
+        if(tnode->getSymbol()->getType()==C1Parser::SemiColon)
+        {
+            auto empty_stmt = new empty_stmt_syntax;
+            empty_stmt->line = ctx->getStart()->getLine();
+            empty_stmt->pos = ctx->getStart()->getCharPositionInLine();
+            return empty_stmt; 
+        }
+    }
+    return new var_def_stmt_syntax; // never here
 }
 
 antlrcpp::Any syntax_tree_builder::visitLval(C1Parser::LvalContext *ctx)
 {
+    auto lval = new lval_syntax;
+    lval->line = ctx->getStart()->getLine();
+    lval->pos = ctx->getStart()->getCharPositionInLine();
+    lval->name = ctx->Identifier()->getText();
+    if(ctx->exp())
+        lval->array_index.reset(visit(ctx->exp()).as<expr_syntax*>());
+    return lval;
 }
 
 antlrcpp::Any syntax_tree_builder::visitCond(C1Parser::CondContext *ctx)
 {
+    auto cond = new cond_syntax;
+    cond->line = ctx->getStart()->getLine();
+    cond->pos = ctx->getStart()->getCharPositionInLine();
+    cond->lhs.reset(visit(ctx->exp(0)).as<expr_syntax*>());
+    cond->rhs.reset(visit(ctx->exp(1)).as<expr_syntax*>());
+    if(ctx->relop()->Equal())
+        cond->op = relop::equal;
+    if(ctx->relop()->NonEqual())
+        cond->op = relop::non_equal;
+    if(ctx->relop()->Less())
+        cond->op = relop::less;
+    if(ctx->relop()->Greater())
+        cond->op = relop::greater;
+    if(ctx->relop()->LessEqual())
+        cond->op = relop::less_equal;
+    if(ctx->relop()->GreaterEqual())
+        cond->op = relop::greater_equal;
+    return cond;
 }
 
 // Returns antlrcpp::Any, which is constructable from any type.
