@@ -53,7 +53,7 @@ antlrcpp::Any syntax_tree_builder::visitConstdecl(C1Parser::ConstdeclContext *ct
 {
     // one decl may contain multiple defs
     if(!ctx->Int())
-        err.warn(ctx->constdef()[0]->Identifier()->getToken()->getLine(), ctx->constdef()[0]->Identifier()->getToken()->getCharPositionInLine(), "Implicit type declaration of variable "+ctx->constdef()[0]->Identifier()->getText());
+        err.warn(ctx->constdef()[0]->Identifier()->getSymbol()->getLine(), ctx->constdef()[0]->Identifier()->getSymbol()->getCharPositionInLine(), "Implicit type declaration of variable "+ctx->constdef()[0]->Identifier()->getText());
     ptr_list<var_def_stmt_syntax> var_defs;
     auto defs = ctx->constdef();
     for(auto &def : defs)
@@ -124,7 +124,7 @@ antlrcpp::Any syntax_tree_builder::visitVardecl(C1Parser::VardeclContext *ctx)
     // one decl may contain multiple defs
     // emit warning if there's no `int`
     if(!ctx->Int())
-        err.warn(ctx->vardef()[0]->Identifier()->getToken()->getLine(), ctx->vardef()[0]->Identifier()->getToken()->getCharPositionInLine(), "Implicit type declaration of variable "+ctx->vardef()[0]->Identifier()->getText());
+        err.warn(ctx->vardef()[0]->Identifier()->getSymbol()->getLine(), ctx->vardef()[0]->Identifier()->getSymbol()->getCharPositionInLine(), "Implicit type declaration of variable "+ctx->vardef()[0]->Identifier()->getText());
     ptr_list<var_def_stmt_syntax> var_defs;
     auto defs = ctx->vardef();
     for(auto &def : defs)

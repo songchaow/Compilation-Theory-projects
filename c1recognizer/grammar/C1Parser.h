@@ -59,10 +59,10 @@ public:
     CompilationUnitContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EOF();
-    std::vector<DeclContext *> decl();
-    DeclContext* decl(size_t i);
     std::vector<FuncdefContext *> funcdef();
     FuncdefContext* funcdef(size_t i);
+    std::vector<DeclContext *> decl();
+    DeclContext* decl(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -219,8 +219,8 @@ public:
   public:
     BlockitemContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    DeclContext *decl();
     StmtContext *stmt();
+    DeclContext *decl();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

@@ -1,0 +1,19 @@
+int ta = 2;
+void fun()
+{
+    int b = 2;
+}
+void main()
+{
+    fun();
+    int a=5;
+    int b=3,g=4,e=5;
+    int c[] = {1,2,3,4,5,6};
+    b = a;
+    if(b>a)
+    b = 5;
+    ;
+    k = 5;
+    jiji[5] = {3,5,6,4,22};
+    c[5] = 4;
+}

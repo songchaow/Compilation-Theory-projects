@@ -1,7 +1,7 @@
 parser grammar C1Parser;
 options { tokenVocab = C1Lexer; }
 
-compilationUnit: (decl | funcdef)+ EOF;
+compilationUnit: (funcdef | decl)+ EOF;
 decl: constdecl | vardecl;
 constdecl: Const Int constdef (Comma constdef)* SemiColon
     | Const constdef (Comma constdef)* SemiColon // implicit type declaration, with warning
@@ -19,7 +19,7 @@ vardef: Identifier
     ;
 funcdef: Void Identifier LeftParen RightParen block;
 block: LeftBrace blockitem* RightBrace;
-blockitem: decl | stmt;
+blockitem: stmt | decl;
 stmt: lval Assign exp SemiColon
     | Identifier LeftParen RightParen SemiColon
     | block
