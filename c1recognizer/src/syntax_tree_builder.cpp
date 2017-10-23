@@ -150,6 +150,7 @@ antlrcpp::Any syntax_tree_builder::visitVardef(C1Parser::VardefContext *ctx)
         {
             // the same case with constdef
             auto it = children.begin();
+            size_t bracket_line,bracket_pos;
             // determines if there is an `exp` immediately after `LeftBracket`
             while(it!=children.end())
             {
@@ -157,7 +158,11 @@ antlrcpp::Any syntax_tree_builder::visitVardef(C1Parser::VardefContext *ctx)
                 {
                     antlr4::tree::TerminalNode *tnode = dynamic_cast<antlr4::tree::TerminalNode *>(*it);
                     if(tnode->getSymbol()->getType()==C1Parser::LeftBracket)
+                    {
+                        bracket_line=tnode->getSymbol()->getLine();
+                        bracket_pos=tnode->getSymbol()->getCharPositionInLine();
                         break;//we've locate the LeftBracket
+                    }
                 }
                 it++;
             }
@@ -170,6 +175,8 @@ antlrcpp::Any syntax_tree_builder::visitVardef(C1Parser::VardefContext *ctx)
             {
                 // deduce the length from number of `exp`
                 literal_syntax* num = new literal_syntax;
+                num->line = bracket_line;
+                num->pos = bracket_pos+1;
                 num->number = exps.size(); 
                 result->array_length.reset( num );
             }
