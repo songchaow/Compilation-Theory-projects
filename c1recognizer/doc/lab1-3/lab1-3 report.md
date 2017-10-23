@@ -1,0 +1,92 @@
+ # Lab 1-3 Report
+
+> PB15000102 王嵩超
+
+# 分析与设计
+
+###ANTLR生成代码的概览
+
+ANTLR会从`g4`文件生成Parser、Listener、Visitor(如果加上`-visitor`选项)的相关代码。
+
+Parser相关代码提供了用于生成parse tree的函数(以规则命名，返回类型为`SomeRuleContext`)，同时定义了每个规则所对应的`SomeRuleContext`类，该上下文类作为生成的Parse tree的子节点，提供了访问该rule的子rule的相关member functions(以子rule的名称为标识符)。(eg: `decl()` is in class `CompilationUnitContext`)
+
+另外，为方便为visitor提供接口，每个上下文类均提供了相同名字的member function:`accept(... visitor)`。`accept`方法先判断传参是否为`C1ParserVisitor*`，若为是，则调用该上下文类的visit方法。
+
+另外，为方便为listener提供接口，每个上下文类均提供了相同名字的member function:`enterRule()`, `exitRule()`。
+
+Visitor相关代码包含`C1ParserBaseVisitor`类，`C1ParserBaseVisitor`类提供了各个规则的`visitSomeRule`方法，其默认实现为返回访问当前节点所有子节点的结果`visitChildren()`。本实验的`syntax_tree_builder`类继承了此类，`visitSomeRule`方法由我们自己编写。
+
+当我们得到`ParseTree`对象时，有两种分析`ParseTree`的方式：
+
+- use a listener
+
+  ParseTreeWalker的`walk()`函数将会逐一访问子节点，并在每次进入rule之前先执行该Rule的`enterRule`，每次退出rule后执行该rule的`exitRule`。
+
+- use a visitor
+
+  此方式可自己定制访问路线。通过编写`visitSomeRule()`函数，从传入的Context\*类型中得到想要深入访问的子节点，再次调用`visit`。
+
+  实验框架代码调用最顶层的`visit(*ctx)`。由属于ANTLR C++库的`AbstractParseTreeVisitor`类提供最顶层的`visit(Parsetree *tree)`方法(在本Lab中，传入的tree就是`CompilationUnitContext`)。该方法会调用tree的`accept`。如前一段所述，`accept`再调用rule的`visitSomeRule`方法。我们的代码得以执行。
+
+### 设计
+
+本次实验的工作集中在编写各个`visitSomeRule()`函数。
+
+每个`visitSomeRule()`的工作流程类似：分析传入的\*ctx，判断属于该rule的哪个选择，再新建相应的语法节点(syntax tree node)。主要困难有三：
+
+- 每条rule，与每个语法节点并不是一一对应的关系，以下情况均有出现：
+
+  - 一条rule的多个选择，甚至是多条rule的某些选择，均对应一种类型的语法节点，只是语法节点的字段不同
+
+    如：`constdef: Identifier Assign exp`和`vardef: Identifier Assign exp`均对应`var_def_stmt_syntax`类型的语法节点，只是语法节点内的`isconst`字段有区别。
+
+  - 一条rule会对应到多个语法节点。比如`stmt`在文法里均表示“语句”这一类型，但在语法数据结构里，“赋值语句”，“声明语句”
+
+  故写代码时需要先理清当前rule可能会映射到哪几个类型的语法节点，再写判断逻辑。
+
+- 写程序时需要用到ANTLR提供的API函数。但ANTLR并没有提供详细的C++平台的API文档。比较靠谱的办法只有深入源码查看`ParseTree`类的定义(倒是可以看Java平台的文档，比较类似，但是还是有很多细节没有说明)。
+
+  例如，一个节点的所有子节点构成的vector，可通过访问`children`成员来得到。
+
+  又例如：要实现在遍历子节点过程中，判断当前节点是否是某个终结符(而不是判断是不是某个非终结符，非终结符的类型是`...Context`)，就不能用库函数`antlr::is<typename T>(*node)`来判断。因为所有终结符都是`TerminalNode*`这个类型，无法用`antlr::is`区分开。这时就先需要用`TerminalNode`类的成员`getSymbol()`来得到`Token*`类型的符号，再调用`getType()`来得到为每个终结符分配的枚举类型，即一个整数。而`getType()`返回的到底是什么，只能通过看源码来确认
+
+  (Java文档对`getType()`的解释是："Get the token type of the token"，**但是我仅凭此无法确认token type就是指的是为每个终结符分配的整数值**)
+
+- 程序中大量用到了智能指针，template，以及通用的类型`antlr4::Any`。有些杂项需要注意，否则编译会出错：
+
+  存储成`Any`类型的对象，再用`as`转换成原对象时，`as`的参数不能是原类型以外的类型(即使是原类型的子类或父类)。
+
+  在一个可能产生多种类型的语法节点的`visitSomeRule`函数中(如`visitStmt`)，最终返回值应用`static_cast`转换成父类，这样在上层调用`as`时就不用考虑多种情况。
+
+  ​
+
+
+
+## troubleshooting记录
+
+许多错误都来源于**设计**中提到的各种注意事项。其他的以下错误如下：
+
+- 出现`std::badcast`异常
+
+  原因是使用`as`时，存储时的类型与取出时指定的类型不匹配。
+
+
+- 部分`visit(*ctx)`的参数类型错误(提示不存在这种类型的`visit`)
+
+  原因如下：
+
+  出错的代码类似为：`visit(ctx->exp()[0])`
+
+  当某个上下文类SomeContext内的某个选择可能有多个exp节点时，调用`exp()`的返回结果就是一个vector，vector元素为每个exp元素的指针，但如果可以确定SomeContext内的所有选择最多也只有一个exp节点时，`exp()`的返回结果就是指向该exp节点的指针。
+
+  出错代码中ctx内部最多只有一个exp，故`ctx->exp()`已经是想要的结果了，自己之前还是以为它是向量，于是加上了`[0]`。
+
+## 重点与难点 解答
+
+1. 了解、使用ANTLR分析树的编程接口，书面总结它们与你在lab1-2中写的文法之间的关系
+
+   已在**分析与设计**的**ANTLR生成代码的概览**中总结。
+
+2. ​
+
+- LL*文法与LL文法的比较

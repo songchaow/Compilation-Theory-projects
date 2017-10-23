@@ -1,13 +1,17 @@
 parser grammar C1Parser;
 options { tokenVocab = C1Lexer; }
 
-compilationUnit: (decl | funcdef)+;
+compilationUnit: (decl | funcdef)+ EOF;
 decl: constdecl | vardecl;
-constdecl: Const Int constdef (Comma constdef)* SemiColon;
+constdecl: Const Int constdef (Comma constdef)* SemiColon
+    | Const constdef (Comma constdef)* SemiColon // implicit type declaration, with warning
+    ; 
 constdef: Identifier Assign exp
     | Identifier LeftBracket exp? RightBracket Assign LeftBrace exp (Comma exp)* RightBrace
     ;
-vardecl: Int vardef (Comma vardef)* SemiColon;
+vardecl: Int vardef (Comma vardef)* SemiColon
+    | vardef (Comma vardef)* SemiColon // implicit type declaration, with warning
+    ;
 vardef: Identifier 
     | Identifier LeftBracket exp RightBracket
     | Identifier Assign exp
