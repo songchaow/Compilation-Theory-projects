@@ -67,5 +67,5 @@ Identifier: [a-zA-Z_][a-zA-Z0-9_]*;
 Number: [0-9]+ | '0x' [0-9a-fA-F]+ ;
 
 WhiteSpace: [ \t\r\n]+ -> skip;
-LineComment: '//'  ~[\r\n]* '\r'? '\n' -> skip ;
+LineComment: '//'  (~[\r\n]|'\\\r\n'|'\\\n')* '\r'? '\n' -> skip ;
 BlockComment: '/*' .*? '*/' -> skip;
