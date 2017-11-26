@@ -10,7 +10,7 @@ using namespace c1_recognizer::syntax_tree;
 void assembly_builder::visit(assembly &node)
 {
     // a module is allocated
-    module.reset(new Module(node.source_name, context));
+    // module.reset(new Module(node.source_name, context));
     for(auto&& def:node.global_defs)
         def.get()->accept(*this);
 }
@@ -135,7 +135,7 @@ void assembly_builder::visit(unaryop_expr_syntax &node)
             const_result = -const_result;
     }
     else if(node.op==unaryop::minus)
-        value_result = builder.CreateSub(ConstantInt::get(context,APInt(0,32,true)),rhs);
+        value_result = builder.CreateSub(ConstantInt::get(context,APInt(32,0,true)),rhs);
 }
 
 void assembly_builder::visit(lval_syntax &node)
@@ -205,7 +205,7 @@ void assembly_builder::visit(lval_syntax &node)
                 /* auto actual_index = builder.CreateMul(value_result,ConstantInt::get(context,APInt(4,32,true)));
                 value_result = builder.CreateAdd(val_ptr,actual_index);  */
                 std::vector<Value*> index_list;
-                index_list.push_back(ConstantInt::get(context,APInt(0,32,true)));
+                index_list.push_back(ConstantInt::get(context,APInt(32,0,true)));
                 index_list.push_back(value_result);
                 auto element_ptr = builder.CreateGEP(Type::getInt32Ty(context),val_ptr,index_list);
                 if(lval_as_rval)
@@ -237,7 +237,7 @@ void assembly_builder::visit(literal_syntax &node)
     if(constexpr_expected)
         const_result = node.number;
     else
-        value_result = ConstantInt::get(context,APInt(1,32,true));
+        value_result = ConstantInt::get(context,APInt(32,0,true));
 }
 
 void assembly_builder::visit(var_def_stmt_syntax &node)
@@ -267,7 +267,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             for(auto&& value_ptr:node.initializers)
             {   // calculate initial values statically
                 value_ptr->accept(*this);
-                init_values.push_back(ConstantInt::get(context,APInt(const_result,32,true)));
+                init_values.push_back(ConstantInt::get(context,APInt(32,const_result,true)));
             }
             constexpr_expected = false;
             auto array_init = ConstantArray::get(array_ty,init_values);
@@ -278,7 +278,8 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
         {
             constexpr_expected = true;
             // calculate initial values statically
-            node.initializers[0]->accept(*this);
+            if(node.initializers.size()>=1)
+                node.initializers[0]->accept(*this);
             auto integer_init = ConstantInt::get(Type::getInt32Ty(context),const_result);
             gval = new GlobalVariable(Type::getInt32Ty(context),node.is_constant,GlobalValue::LinkageTypes::ExternalLinkage,integer_init);
         }
@@ -298,7 +299,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 err.error(node.line,node.pos,"Declaring array \""+node.name+"\" with longer initializers than its length.");
         }
         
-        auto var_ptr = builder.CreateAlloca(Type::getInt32Ty(context),is_array?ConstantInt::get(context,APInt(const_result,32,true)):nullptr);
+        auto var_ptr = builder.CreateAlloca(Type::getInt32Ty(context),is_array?ConstantInt::get(context,APInt(32,const_result,true)):nullptr);
         if(!declare_variable(node.name,var_ptr,node.is_constant,is_array))
             err.error(node.line,node.pos,"Identifier \""+node.name+"\" has already been declared before.");
         if(is_array)
@@ -306,12 +307,12 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             // assign values in initializers
             std::vector<Value*> index_list;
             int index=0;
-            index_list.push_back(ConstantInt::get(context,APInt(0,32,true)));
-            index_list.push_back(ConstantInt::get(context,APInt(index,32,true)));
+            index_list.push_back(ConstantInt::get(context,APInt(32,0,true)));
+            index_list.push_back(ConstantInt::get(context,APInt(32,index,true)));
             for(auto&& value_ptr:node.initializers)
             {
-                index_list[1] = ConstantInt::get(context,APInt(index,32,true));
-                auto elem_ptr = builder.CreateGEP(var_ptr,index_list);
+                index_list[1] = ConstantInt::get(context,APInt(32,index,true));
+                auto elem_ptr = builder.CreateGEP(Type::getInt32Ty(context),var_ptr,index_list);
                 // calculate the current value in initializers
                 lval_as_rval = true;
                 value_ptr.get()->accept(*this);
@@ -322,7 +323,8 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
         else //single element
         {
             lval_as_rval = true;
-            node.initializers[0]->accept(*this);
+            if(node.initializers.size()>=1)
+                node.initializers[0]->accept(*this);
             builder.CreateStore(value_result,var_ptr);
         }
         
