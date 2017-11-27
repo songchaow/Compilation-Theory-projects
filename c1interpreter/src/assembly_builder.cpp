@@ -17,8 +17,8 @@ void assembly_builder::visit(assembly &node)
 
 void assembly_builder::visit(func_def_syntax &node)
 {
-    // create void function type, with no params, as specified in C1 language
-    auto ftype = FunctionType::get(Type::getVoidTy(context),ArrayRef<Type*>(),false);
+    // create void function type, with no params, as specified in C1 languagen
+    auto ftype = FunctionType::get(Type::getVoidTy(context),false);
     auto func = Function::Create(ftype,GlobalValue::LinkageTypes::ExternalLinkage,node.name,module.get());
     // one function in C1 has only one block ({...})
     // note that it's possible that one function has more than one LLVM block
@@ -93,10 +93,11 @@ void assembly_builder::visit(binop_expr_syntax &node)
             case binop::divide:
                 if(rhs_num==0)
                 {
+                    error_flag = true;
                     err.error(node.line,node.pos,"Division by zero found in constant expression.");
                     const_result = 0;
                 }
-                const_result = lhs_num/rhs_num;break;
+                else const_result = lhs_num/rhs_num;break;
             case binop::modulo:
                 const_result = lhs_num%rhs_num;break;
             case binop::multiply:
@@ -197,21 +198,25 @@ void assembly_builder::visit(lval_syntax &node)
             }
             else
             {
-                //calculate the index expr
+                // calculate the index expr
+                // note that the index must be fetched as a right value, but `lval_as_rval` for the array element may be false.
+                // so a backup should be made.
+                auto lval_as_rval_backup = lval_as_rval;
                 lval_as_rval = true;
                 node.array_index.get()->accept(*this);
+                lval_as_rval = lval_as_rval_backup;
 
                 //calculate address of the element
                 /* auto actual_index = builder.CreateMul(value_result,ConstantInt::get(context,APInt(4,32,true)));
                 value_result = builder.CreateAdd(val_ptr,actual_index);  */
                 std::vector<Value*> index_list;
-                index_list.push_back(ConstantInt::get(context,APInt(32,0,true)));
+                //index_list.push_back(ConstantInt::get(context,APInt(32,0,true)));
                 index_list.push_back(value_result);
                 auto element_ptr = builder.CreateGEP(Type::getInt32Ty(context),val_ptr,index_list);
                 if(lval_as_rval)
-                    value_result = element_ptr;
-                else
                     value_result = builder.CreateLoad(element_ptr);
+                else
+                    value_result = element_ptr;
             }
         }
         else // a single element
@@ -237,7 +242,7 @@ void assembly_builder::visit(literal_syntax &node)
     if(constexpr_expected)
         const_result = node.number;
     else
-        value_result = ConstantInt::get(context,APInt(32,0,true));
+        value_result = ConstantInt::get(context,APInt(32,node.number,true));
 }
 
 void assembly_builder::visit(var_def_stmt_syntax &node)
@@ -271,17 +276,25 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             }
             constexpr_expected = false;
             auto array_init = ConstantArray::get(array_ty,init_values);
-            gval = new GlobalVariable(Type::getInt32Ty(context),node.is_constant,GlobalValue::LinkageTypes::ExternalLinkage,array_init);
+            gval = new GlobalVariable(*(module.get()),Type::getInt32Ty(context),node.is_constant,GlobalValue::LinkageTypes::ExternalLinkage,array_init,node.name);
 
         }
         else // single element
         {
-            constexpr_expected = true;
-            // calculate initial values statically
             if(node.initializers.size()>=1)
+            {
+                // calculate initial values statically
+                constexpr_expected = true;
                 node.initializers[0]->accept(*this);
-            auto integer_init = ConstantInt::get(Type::getInt32Ty(context),const_result);
-            gval = new GlobalVariable(Type::getInt32Ty(context),node.is_constant,GlobalValue::LinkageTypes::ExternalLinkage,integer_init);
+                constexpr_expected = false;
+                auto integer_init = ConstantInt::get(Type::getInt32Ty(context),const_result);
+                gval = new GlobalVariable(*(module.get()),Type::getInt32Ty(context),node.is_constant,GlobalValue::LinkageTypes::ExternalLinkage,integer_init,node.name);
+            }
+            else
+            {
+                auto integer_init = ConstantInt::get(Type::getInt32Ty(context),0);
+                gval = new GlobalVariable(*(module.get()),Type::getInt32Ty(context),node.is_constant,GlobalValue::LinkageTypes::ExternalLinkage,integer_init,node.name);
+            }
         }
         if(!declare_variable(node.name,gval,node.is_constant,is_array))
             err.error(node.line,node.pos,"Identifier \""+node.name+"\" has already been declared before.");
@@ -307,12 +320,12 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             // assign values in initializers
             std::vector<Value*> index_list;
             int index=0;
-            index_list.push_back(ConstantInt::get(context,APInt(32,0,true)));
+            //index_list.push_back(ConstantInt::get(context,APInt(32,0,true)));
             index_list.push_back(ConstantInt::get(context,APInt(32,index,true)));
             for(auto&& value_ptr:node.initializers)
             {
-                index_list[1] = ConstantInt::get(context,APInt(32,index,true));
-                auto elem_ptr = builder.CreateGEP(Type::getInt32Ty(context),var_ptr,index_list);
+                index_list[0] = ConstantInt::get(context,APInt(32,index,true));
+                auto elem_ptr = builder.CreateGEP(Type::getInt32Ty(context),var_ptr,ArrayRef<Value*>(index_list));
                 // calculate the current value in initializers
                 lval_as_rval = true;
                 value_ptr.get()->accept(*this);
@@ -324,8 +337,10 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
         {
             lval_as_rval = true;
             if(node.initializers.size()>=1)
+            {
                 node.initializers[0]->accept(*this);
-            builder.CreateStore(value_result,var_ptr);
+                builder.CreateStore(value_result,var_ptr);
+            }
         }
         
     }
@@ -354,7 +369,7 @@ void assembly_builder::visit(func_call_stmt_syntax &node)
     if(functions.count(node.name))
     {
         auto func = functions[node.name];
-        builder.CreateCall(func,nullptr);
+        builder.CreateCall(func);
     }
     else
     {
@@ -386,19 +401,23 @@ void assembly_builder::visit(if_stmt_syntax &node)
 {
     // three blocks must be created. we use bb_count to uniquely identify them
     auto then_block = BasicBlock::Create(context,"then"+std::to_string(bb_count),current_function);
-    auto else_block = BasicBlock::Create(context,"else"+std::to_string(bb_count),current_function);
     auto cont_block = BasicBlock::Create(context,"continue"+std::to_string(bb_count),current_function);
     bb_count+=3;
     // generate code judging whether condition is met
     node.pred.get()->accept(*this);
     // add branch instructions for original brick(this cannot be done in visit function for cond_syntax)
-    builder.CreateCondBr(value_result,then_block,else_block);
+    if(node.else_body)
+    {
+        auto else_block = BasicBlock::Create(context,"else"+std::to_string(bb_count),current_function);    
+        builder.CreateCondBr(value_result,then_block,else_block);
+        builder.SetInsertPoint(else_block);
+        node.else_body->accept(*this);
+        builder.CreateBr(cont_block);
+    }
+    else
+        builder.CreateCondBr(value_result,then_block,cont_block);
     builder.SetInsertPoint(then_block);
     node.then_body.get()->accept(*this);
-    builder.CreateBr(cont_block);
-
-    builder.SetInsertPoint(else_block);
-    node.else_body.get()->accept(*this);
     builder.CreateBr(cont_block);
     // these two blocks won't have more contents
     builder.SetInsertPoint(cont_block);
@@ -412,6 +431,8 @@ void assembly_builder::visit(while_stmt_syntax &node)
     auto loop_block = BasicBlock::Create(context,"loop"+std::to_string(bb_count),current_function);
     auto cont_block = BasicBlock::Create(context,"continue"+std::to_string(bb_count),current_function);
     bb_count+=2;
+    // first we must jump to judge
+    builder.CreateBr(judge_block);
     // generate code judging whether condition is met
     builder.SetInsertPoint(judge_block);
     node.pred.get()->accept(*this);
