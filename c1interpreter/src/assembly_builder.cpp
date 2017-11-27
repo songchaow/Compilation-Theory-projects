@@ -270,7 +270,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             if(const_result<0)
             {
                 error_flag = true;
-                err.error(node.line,node.pos,"Referencing array element \""+node.name+"\" with negative index.");
+                err.error(node.line,node.pos,"Index of array \""+node.name+"\" cannot be negative.");
             }
             
             if(const_result<node.initializers.size())
