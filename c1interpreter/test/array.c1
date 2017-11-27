@@ -1,0 +1,22 @@
+int a[1];
+int b[2];
+int c[2] = {1};
+int d[1] = {1};
+int e[] = {1};
+int f[] = {1, 2};
+const int g[2] = {1};
+const int h[1] = {1};
+const int i[] = {1};
+const int j[] = {1, 2};
+void main() {
+    int a[1];
+    int b[2];
+    int c[2] = {1};
+    int d[1] = {1};
+    int e[] = {1};
+    int f[] = {1, 2};
+    const int g[2] = {1};
+    const int h[1] = {1};
+    const int i[] = {1};
+    const int j[] = {1, 2};
+}

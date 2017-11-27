@@ -1,0 +1,13 @@
+void main() {
+    int a = 1, b = 0, t, i = 0, n;
+    input();
+    n = input_var;
+    while (i < n) {
+        output_var = a;
+        output();
+        t = a;
+        a = a + b;
+        b = t;
+        i = i + 1;
+    }
+}

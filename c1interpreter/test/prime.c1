@@ -1,0 +1,32 @@
+int primes[256];
+
+int isPrime_arg_pos, isPrime_arg_v, isPrime_rtv;
+void isPrime() {
+    int i = 0;
+    isPrime_rtv = 1;
+    while (i < isPrime_arg_pos) {
+        if (isPrime_arg_v % primes[i] == 0)
+            isPrime_rtv = 0;
+        i = i + 1;
+    }
+}
+
+void main() {
+    int n;
+    input();
+    n = input_var;
+    int v = 2;
+    int pos = 0;
+    while (pos < n) {
+        isPrime_arg_pos = pos;
+        isPrime_arg_v = v;
+        isPrime();
+        if (isPrime_rtv > 0) {
+            primes[pos] = v;
+            output_var = v;
+            output();
+            pos = pos + 1;
+        }
+        v = v + 1;
+    }
+}
