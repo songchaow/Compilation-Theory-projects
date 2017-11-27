@@ -31,7 +31,7 @@ void assembly_builder::visit(func_def_syntax &node)
     if(functions.count(node.name))
     {
         error_flag = true;
-        err.error(node.line,node.pos,"Function \""+node.name+" \"has been declared before.");
+        err.error(node.line,node.pos,"Function \""+node.name+"\" has been defined before.");
     }
     else
         functions[node.name] = func;
@@ -160,14 +160,14 @@ void assembly_builder::visit(lval_syntax &node)
     {
         error_flag = true;
         err.error(node.line,node.pos,"Lvalue \""+node.name+"\" cannot be used as constant expression.");
-        value_result = nullptr;
+        value_result = ConstantInt::get(context,APInt(32,0,true));
         return;
     }
     if(!val_ptr)
     {
         error_flag = true; // it hasn't been declared before
         err.error(node.line,node.pos,"Undeclared variable \""+node.name+"\".");
-        value_result = nullptr;
+        value_result = ConstantInt::get(context,APInt(32,0,true));
         return;
     }
 
@@ -176,8 +176,8 @@ void assembly_builder::visit(lval_syntax &node)
         if(is_const)
         {
             error_flag = true;
-            err.error(node.line,node.pos,"Constant \""+node.name+"\"cannot be Lvalue.");
-            value_result = nullptr;
+            err.error(node.line,node.pos,"Constant \""+node.name+"\" cannot be Lvalue.");
+            value_result = ConstantInt::get(context,APInt(32,0,true));
         return;
         }
         else if(is_array)
@@ -188,12 +188,13 @@ void assembly_builder::visit(lval_syntax &node)
                 {
                     error_flag = true;
                     err.error(node.line,node.pos,"Array identifier \""+node.name+"\" cannot be Lvalue.");
-                    value_result = nullptr;
+                    value_result = ConstantInt::get(context,APInt(32,0,true));
                     return;
                 }
                 else
                 {
                     value_result = val_ptr;
+                    err.warn(node.line,node.pos,"The address of array \""+node.name+"\" is fetched, which is usually meaningless in C1.");
                 }
             }
             else
@@ -205,6 +206,13 @@ void assembly_builder::visit(lval_syntax &node)
                 lval_as_rval = true;
                 node.array_index.get()->accept(*this);
                 lval_as_rval = lval_as_rval_backup;
+
+                // examine whether the index is legal
+                if(const_result<0)
+                {
+                    error_flag = true;
+                    err.error(node.line,node.pos,"Referencing array element \""+node.name+"\" with negative index.");
+                }
 
                 //calculate address of the element
                 /* auto actual_index = builder.CreateMul(value_result,ConstantInt::get(context,APInt(4,32,true)));
@@ -225,7 +233,7 @@ void assembly_builder::visit(lval_syntax &node)
             {
                 error_flag = true;
                 err.error(node.line,node.pos,"Variable \""+node.name+"\" with `int` type can not be used as an array identifier.");
-                value_result = nullptr;
+                value_result = ConstantInt::get(context,APInt(32,0,true));
                 return;
             }
             else if(lval_as_rval)
@@ -258,10 +266,17 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             constexpr_expected = true;
             node.array_length.get()->accept(*this);
             constexpr_expected = false;
+        // check if the index is legal
+            if(const_result<0)
+            {
+                error_flag = true;
+                err.error(node.line,node.pos,"Referencing array element \""+node.name+"\" with negative index.");
+            }
             
             if(const_result<node.initializers.size())
             {
-                err.error(node.line,node.pos,"Initializers of Array \""+node.name+" \" are bigger than its size.");
+                error_flag = true;
+                err.error(node.line,node.pos,"Initializers of Array \""+node.name+"\" are bigger than its size.");
                 return;
             }
 
@@ -297,7 +312,10 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             }
         }
         if(!declare_variable(node.name,gval,node.is_constant,is_array))
+        {
+            error_flag = true;
             err.error(node.line,node.pos,"Identifier \""+node.name+"\" has already been declared before.");
+        }
     }
     else
     {
@@ -309,12 +327,18 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             node.array_length.get()->accept(*this);
             constexpr_expected = false;
             if(const_result<node.initializers.size())
+            {
+                error_flag = true;
                 err.error(node.line,node.pos,"Declaring array \""+node.name+"\" with longer initializers than its length.");
+            }
         }
         
         auto var_ptr = builder.CreateAlloca(Type::getInt32Ty(context),is_array?ConstantInt::get(context,APInt(32,const_result,true)):nullptr);
         if(!declare_variable(node.name,var_ptr,node.is_constant,is_array))
+        {
+            error_flag = true;
             err.error(node.line,node.pos,"Identifier \""+node.name+"\" has already been declared before.");
+        }
         if(is_array)
         {
             // assign values in initializers
@@ -355,7 +379,7 @@ void assembly_builder::visit(assign_stmt_syntax &node)
     if(!value_result)
     {
         error_flag = true;
-        err.error(node.line,node.pos,"Unable to resolve identifier \""+node.target->name+" \".");
+        err.error(node.line,node.pos,"Unable to resolve identifier \""+node.target->name+"\".");
         return;
     }
     // calculate the value to be assigned
@@ -374,7 +398,7 @@ void assembly_builder::visit(func_call_stmt_syntax &node)
     else
     {
         error_flag = true;
-        err.error(node.line,node.pos,"Undefined function \""+node.name+" \".");
+        err.error(node.line,node.pos,"Undefined function \""+node.name+"\".");
     }
 }
 
